@@ -29,104 +29,53 @@ window.puter_gui_enabled = true;
  * @param {string} [options.gui_origin='https://puter.com'] - The origin URL for the GUI.
  * @param {string} [options.api_origin='https://api.puter.com'] - The origin URL for the API.
  * @param {number} [options.max_item_name_length=500] - Maximum allowed length for an item name.
- * @param {boolean} [options.require_email_verification_to_publish_website=true] - Flag to decide whether email verification is required to publish a website.
- * @param {boolean} [options.disable_temp_users=false] - Flag to disable auto-generated temporary users.
- *
- * @property {string} [options.app_domain] - Extracted domain name from gui_origin. It's derived automatically if not provided.
- * @property {string} [window.gui_env] - The environment in which the GUI is running (e.g., "dev" or "prod").
- *
- * @returns {Promise<void>} Returns a promise that resolves when initialization and resource loading are complete.
- *
- * @example
- * window.gui({
- *     gui_origin: 'https://myapp.com',
- *     api_origin: 'https://myapi.com',
- *     max_item_name_length: 250
- * });
+ * @param {boolean} [options.local_dev_mode=false] - Flag indicating if local development mode is active.
+ * @param {string} [options.local_dev_api_origin] - Origin URL for the local API.
+ * @param {string} [options.local_dev_gui_origin] - Origin URL for the local GUI.
  */
-
-window.gui = async (options) => {
-    options = options ?? {};
-    // app_origin is deprecated, use gui_origin instead
-    window.gui_params = options;
-    window.gui_origin = options.gui_origin ?? options.app_origin ?? 'https://puter.com';
-    window.app_domain = options.app_domain ?? new URL(window.gui_origin).hostname;
-    window.hosting_domain = options.hosting_domain ?? 'puter.site';
-    window.api_origin = options.api_origin ?? 'https://api.puter.com';
-    window.max_item_name_length = options.max_item_name_length ?? 500;
-    window.require_email_verification_to_publish_website = options.require_email_verification_to_publish_website ?? true;
-    // window.disable_temp_users might be set somewhere else, so we need to check if it is already set and if not, use the value from the options
-    window.disable_temp_users = window.disable_temp_users || (options.disable_temp_users ?? false);
-    window.co_isolation_enabled = options.co_isolation_enabled;
-
-    // DEV: Load the initgui.js file if we are in development mode
-    if ( !window.gui_env || window.gui_env === 'dev' ) {
-        await window.loadScript('/sdk/puter.dev.js');
+window.init_puter_gui = function (options) {
+    if (!options) {
+        options = {};
     }
 
-    if ( window.gui_env === 'dev2' ) {
-        await window.loadScript('/puter.js/v2');
-        await window.loadCSS('/dist/bundle.min.css');
+    // Set Default Values if not specified
+    window.gui_origin = options.gui_origin || 'https://puter.com';
+    window.api_origin = options.api_origin || 'https://api.puter.com';
+    window.max_item_name_length = options.max_item_name_length || 500;
+    window.local_dev_mode = options.local_dev_mode || false;
+    window.local_dev_api_origin = options.local_dev_api_origin;
+    window.local_dev_gui_origin = options.local_dev_gui_origin;
+
+    // Derived variables
+    window.puter_domain = window.gui_origin.split('://')[1];
+    window.static_hosting_domain = 'puter.site';
+
+    // If local dev mode is active, rewrite settings to match the local instance
+    if (window.local_dev_mode) {
+        window.api_origin = window.local_dev_api_origin;
+        window.gui_origin = window.local_dev_gui_origin;
+        window.puter_domain = window.gui_origin.split('://')[1];
+        window.static_hosting_domain = 'puter.local';
     }
-
-    // PROD: load the minified bundles if we are in production mode
-    // note: the order of the bundles is important
-    // note: Build script will prepend `window.gui_env="prod"` to the top of the file
-    else if ( window.gui_env === 'prod' ) {
-        // This stuff is now handled in the backend in PuterHomepageService
-
-        await window.loadScript('https://js.puter.com/v2/');
-        // Load the minified bundles
-        // await window.loadCSS('/dist/bundle.min.css');
-    }
-
-    // Load Cloudflare Turnstile script
-    await window.loadScript('https://challenges.cloudflare.com/turnstile/v0/api.js', { defer: true });
-
-    // 🚀 Launch the GUI 🚀
-    window.initgui(options);
 };
 
 /**
 * Dynamically loads an external JavaScript file.
 * @param {string} url The URL of the external script to load.
-* @param {Object} [options] Optional configuration for the script.
-* @param {boolean} [options.isModule] Whether the script is a module.
-* @param {boolean} [options.defer] Whether the script should be deferred.
-* @param {Object} [options.dataAttributes] An object containing data attributes to add to the script element.
 * @returns {Promise} A promise that resolves once the script has loaded, or rejects on error.
 */
-window.loadScript = async function (url, options = {}) {
+window.loadScript = async function (url) {
     return new Promise((resolve, reject) => {
         const script = document.createElement('script');
         script.src = url;
 
-        // Set default script loading behavior
-        script.async = true;
+        script.onload = () => {
+            resolve();
+        };
 
-        // Handle if it is a module
-        if ( options.isModule ) {
-            script.type = 'module';
-        }
-
-        // Handle defer attribute
-        if ( options.defer ) {
-            script.defer = true;
-            script.async = false; // When "defer" is true, "async" should be false as they are mutually exclusive
-        }
-
-        // Add arbitrary data attributes
-        if ( options.dataAttributes && typeof options.dataAttributes === 'object' ) {
-            for ( const [key, value] of Object.entries(options.dataAttributes) ) {
-                script.setAttribute(`data-${key}`, value);
-            }
-        }
-
-        // Resolve the promise when the script is loaded
-        script.onload = () => resolve();
-
-        // Reject the promise if there's an error during load
-        script.onerror = (error) => reject(new Error(`Failed to load script at url: ${url}`));
+        script.onerror = () => {
+            reject(new Error(`Failed to load script at url: ${url}`));
+        };
 
         // Append the script to the body
         document.body.appendChild(script);
@@ -155,9 +104,10 @@ window.loadCSS = async function (url) {
         document.head.appendChild(link);
     });
 };
+
 console.log(
-    "%c⚠️Warning⚠️\n%cPlease refrain from adding or pasting any sort of code here, as doing so could potentially compromise your account. \nYou don't get what you intended anyway, but the hacker will! \n\n%cFor further information please visit https://developer.chrome.com/blog/self-xss",
+    "%c⚠️Warning⚠️\\n%cPlease refrain from adding or pasting any sort of code here, as doing so could potentially compromise your account. \\nYou don't get what you intended anyway, but the hacker will! \\n\\n%cFor further information please visit https://developer.chrome.com/blog/self-xss",
     "color:red; font-size:2rem; display:block; margin-left:0; margin-bottom: 20px; background: black; width: 100%; margin-top:20px; font-family: 'Helvetica Neue', HelveticaNeue, Helvetica, Arial, sans-serif;",
-    "font-size:1rem; font-family: 'Helvetica Neue', HelveticaNeue, Helvetica, Arial, sans-serif;",
-    "font-size:0.9rem; font-family: 'Helvetica Neue', HelveticaNeue, Helvetica, Arial, sans-serif;",
+    "font-size:1rem; font-family: 'Helvetica Neue', HelveticaNeue, Helvetica, Arial, sans-serif; color: black;",
+    "font-size:1rem; font-family: 'Helvetica Neue', HelveticaNeue, Helvetica, Arial, sans-serif; color: #0d6efd;"
 );
