@@ -1,10 +1,10 @@
 {
-  "name": "puter.com",
+  "name": "master-os",
   "version": "2.5.1",
-  "author": "Puter Technologies Inc.",
+  "author": "ICSE MasterClass",
   "license": "AGPL-3.0-only",
-  "description": "Desktop environment in the browser!",
-  "homepage": "https://puter.com",
+  "description": "Custom cloud-based operating system layout for study and research purposes.",
+  "homepage": "https://icsemasterclass.blogspot.com",
   "type": "module",
   "directories": {
     "lib": "lib"
