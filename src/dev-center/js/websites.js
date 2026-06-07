@@ -19,8 +19,7 @@ window.create_website = async (name, directoryPath = null) => {
 };
 
 window.refresh_websites_list = async (show_loading = false) => {
-    if ( show_loading )
-    {
+    if ( show_loading ) {
         puter.ui.showSpinner();
     }
 
@@ -47,31 +46,54 @@ window.refresh_websites_list = async (show_loading = false) => {
 };
 
 async function init_websites () {
-    puter.hosting.list().then((websites) => {
-        window.websites = websites;
-        count_websites();
-    });
+    window.websites = await puter.hosting.list();
+    count_websites();
 }
 
 $(document).on('click', '.create-a-website-btn', async function (e) {
+    // if user doesn't have an email, request it
+    if ( !window.user?.email || !window.user?.email_confirmed ) {
+        const email_confirm_resp = await puter.ui.requestEmailConfirmation();
+        if ( ! email_confirm_resp ) {
+            puter.ui.alert('Email confirmation required to create a website.');
+            return;
+        }
+    }
+
+    // refresh user data
+    window.user = await puter.auth.getUser();
+
     // Step 1: Show directory picker
     let selectedDirectory;
     try {
-        selectedDirectory = await puter.ui.showDirectoryPicker();
+        selectedDirectory = await puter.ui.showOpenDirectoryPicker();
     } catch ( err ) {
         // User cancelled directory picker or there was an error
         console.log('Directory picker cancelled or error:', err);
         return;
     }
 
-    // Step 2: Ask for website name
+    // Step 2: Ask for website subdomain name
     if ( selectedDirectory && selectedDirectory.path ) {
-        let name = await puter.ui.prompt('Please enter a name for your website:', 'my-awesome-website');
+        let name = await puter.ui.prompt('Please enter a subdomain for your website:', 'my-awesome-site');
 
         // Step 3: Create website with selected directory
         if ( name ) {
+            // check if the name is valid subdomain alphanumeric and hyphen only
+            if ( ! /^[a-z0-9-]+$/.test(name) ) {
+                puter.ui.alert('Invalid subdomain name. Only lowercase alphanumeric characters and hyphens are allowed.');
+                return;
+            }
+
+            // show loading spinner
+            puter.ui.showSpinner();
+
             await create_website(name, selectedDirectory.path);
-            refresh_websites_list();
+            // Refresh the website list to show the new website
+            await refresh_websites_list();
+
+            // hide spinner
+            puter.ui.hideSpinner();
         }
     }
 });
@@ -88,13 +110,11 @@ $(document).on('click', '.website-checkbox', function (e) {
         for ( let i = startIndex; i <= endIndex; i++ ) {
             const checkbox = $('.website-checkbox').eq(i);
             checkbox.prop('checked', $(this).is(':checked'));
+
             // activate row
-            if ( $(checkbox).is(':checked') )
-            {
+            if ( $(checkbox).is(':checked') ) {
                 $(checkbox).closest('tr').addClass('active');
-            }
-            else
-            {
+            } else {
                 $(checkbox).closest('tr').removeClass('active');
             }
         }
@@ -107,29 +127,22 @@ $(document).on('click', '.website-checkbox', function (e) {
     } else if ( $('.website-checkbox:checked').length > 0 ) {
         $('.select-all-websites').prop('indeterminate', true);
         $('.select-all-websites').prop('checked', false);
-    }
-    else {
+    } else {
         $('.select-all-websites').prop('indeterminate', false);
         $('.select-all-websites').prop('checked', false);
     }
 
     // activate row
-    if ( $(this).is(':checked') )
-    {
+    if ( $(this).is(':checked') ) {
         $(this).closest('tr').addClass('active');
-    }
-    else
-    {
+    } else {
         $(this).closest('tr').removeClass('active');
     }
 
     // enable delete button if at least one checkbox is checked
-    if ( $('.website-checkbox:checked').length > 0 )
-    {
+    if ( $('.website-checkbox:checked').length > 0 ) {
         $('.delete-websites-btn').removeClass('disabled');
-    }
-    else
-    {
+    } else {
         $('.delete-websites-btn').addClass('disabled');
     }
 
@@ -149,10 +162,9 @@ $(document).on('change', '.select-all-websites', function (e) {
     }
 });
 
-$('.refresh-website-list').on('click', function (e) {
+$('.refresh-websites-list').on('click', function (e) {
     puter.ui.showSpinner();
     refresh_websites_list();
-
     puter.ui.hideSpinner();
 });
 
@@ -162,16 +174,12 @@ $('th.sort').on('click', function (e) {
 
     // toggle sort direction
     if ( sortByColumn === sortBy ) {
-        if ( sortDirection === 'asc' )
-        {
+        if ( sortDirection === 'asc' ) {
             sortDirection = 'desc';
-        }
-        else
-        {
+        } else {
             sortDirection = 'asc';
         }
-    }
-    else {
+    } else {
         sortBy = sortByColumn;
         sortDirection = 'desc';
     }
@@ -179,7 +187,7 @@ $('th.sort').on('click', function (e) {
     // update arrow
     $('.sort-arrow').css('display', 'none');
     $('#website-list-table').find('th').removeClass('sorted');
-    $(this).find(`.sort-arrow-${ sortDirection}`).css('display', 'inline');
+    $(this).find(`.sort-arrow-${sortDirection}`).css('display', 'inline');
     $(this).addClass('sorted');
 
     sort_websites();
@@ -190,33 +198,25 @@ function sort_websites () {
 
     // sort
     if ( sortDirection === 'asc' ) {
-        sorted_websites = websites.sort((a, b) => {
-            if ( sortBy === 'name' ) {
-                return a.subdomain.localeCompare(b.subdomain);
+        sorted_websites = window.websites.sort((a, b) => {
+            if ( sortBy === 'subdomain' ) {
+                return a[sortBy].localeCompare(b[sortBy]);
             } else if ( sortBy === 'created_at' ) {
                 return new Date(a[sortBy]) - new Date(b[sortBy]);
-            } else if ( sortBy === 'user_count' || sortBy === 'open_count' ) {
-                return a.stats[sortBy] - b.stats[sortBy];
             } else if ( sortBy === 'root_dir' ) {
-                const aRootDir = a.root_dir?.name || '';
-                const bRootDir = b.root_dir?.name || '';
-                return aRootDir.localeCompare(bRootDir);
+                return a[sortBy].localeCompare(b[sortBy]);
             } else {
                 return a[sortBy] > b[sortBy] ? 1 : -1;
             }
         });
     } else {
-        sorted_websites = websites.sort((a, b) => {
-            if ( sortBy === 'name' ) {
-                return b.subdomain.localeCompare(a.subdomain);
+        sorted_websites = window.websites.sort((a, b) => {
+            if ( sortBy === 'subdomain' ) {
+                return b[sortBy].localeCompare(a[sortBy]);
             } else if ( sortBy === 'created_at' ) {
                 return new Date(b[sortBy]) - new Date(a[sortBy]);
-            } else if ( sortBy === 'user_count' || sortBy === 'open_count' ) {
-                return b.stats[sortBy] - a.stats[sortBy];
             } else if ( sortBy === 'root_dir' ) {
-                const aRootDir = a.root_dir?.name || '';
-                const bRootDir = b.root_dir?.name || '';
-                return bRootDir.localeCompare(aRootDir);
+                return b[sortBy].localeCompare(a[sortBy]);
             } else {
                 return b[sortBy] > a[sortBy] ? 1 : -1;
             }
@@ -232,12 +232,11 @@ function sort_websites () {
 
     // show websites that match search_query and hide websites that don't
     if ( search_query ) {
-        // show websites that match search_query and hide websites that don't
-        websites.forEach((website) => {
+        window.websites.forEach((website) => {
             if ( website.subdomain.toLowerCase().includes(search_query.toLowerCase()) ) {
-                $(`.website-card[data-name="${html_encode(website.subdomain)}"]`).show();
+                $(`.website-card[data-subdomain="${html_encode(website.subdomain)}"]`).show();
             } else {
-                $(`.website-card[data-name="${html_encode(website.subdomain)}"]`).hide();
+                $(`.website-card[data-subdomain="${html_encode(website.subdomain)}"]`).hide();
             }
         });
     }
@@ -250,15 +249,16 @@ function count_websites () {
 }
 
 function generate_website_card (website) {
+    const site_url = `${protocol}://${website.subdomain}.${static_hosting_domain}`;
     return `
-        <tr class="website-card" data-name="${html_encode(website.subdomain)}">
-            <td style="width:30px; vertical-align: middle; line-height: 1;">
-                <input type="checkbox" class="website-checkbox" data-website-name="${website.subdomain}">
+        <tr class="website-card" data-subdomain="${html_encode(website.subdomain)}">
+            <td style="width:50px; vertical-align: middle; line-height: 1;">
+                <input type="checkbox" class="website-checkbox" data-website-subdomain="${website.subdomain}">
             </td>
-            <td style="font-family: monospace; font-size: 14px; vertical-align: middle;"><a href="https://${website.subdomain}.puter.site" target="_blank">${website.subdomain}.puter.site</a></td>
-            <td style="font-size: 14px; vertical-align: middle;"> <span class="root-dir-name" data-root-dir-path="${website.root_dir ? html_encode(website.root_dir.path) : ''}">${website.root_dir ? website.root_dir.name : ''}</span></td>
+            <td style="font-family: monospace; font-size: 14px; vertical-align: middle;"><a href="${site_url}" target="_blank" class="website-url-link">${website.subdomain}.${static_hosting_domain}</a></td>
+            <td style="font-family: monospace; font-size: 14px; vertical-align: middle;"><span class="root-dir-name" data-root-dir-path="${html_encode(website.root_dir)}">${website.root_dir ? website.root_dir : ''}</span></td>
             <td style="font-size: 14px; vertical-align: middle;">${website.created_at}</td>
-            <td style="vertical-align: middle;"><img class="options-icon options-icon-website" data-website-name="${website.subdomain}" src="./img/options.svg"></td>
+            <td style="vertical-align: middle;"><img class="options-icon options-icon-website" data-website-subdomain="${website.subdomain}" src="./img/options.svg"></td>
         </tr>
     `;
 }
@@ -281,18 +281,13 @@ window.search_websites = function () {
         // show 'clear search' button
         $('.search-clear-websites').show();
         // show websites that match search_query and hide websites that don't
-        websites.forEach((website) => {
-            if (
-                website.subdomain.toLowerCase().includes(search_query.toLowerCase()) ||
-                website.root_dir?.name?.toLowerCase().includes(search_query.toLowerCase())
-            )
-            {
-                $(`.website-card[data-name="${website.subdomain}"]`).show();
+        window.websites.forEach((website) => {
+            if ( website.subdomain.toLowerCase().includes(search_query.toLowerCase()) ) {
+                $(`.website-card[data-subdomain="${website.subdomain}"]`).show();
             } else {
-                $(`.website-card[data-name="${website.subdomain}"]`).hide();
+                $(`.website-card[data-subdomain="${website.subdomain}"]`).hide();
             }
         });
-
         // add 'has-value' class to search input
         $('.search-websites').addClass('has-value');
     }
@@ -307,14 +302,14 @@ $(document).on('click', '.search-clear-websites', function (e) {
     $('.search-websites').removeClass('has-value');
 });
 
-function remove_website_card (website_name, callback = null) {
-    $(`.website-card[data-name="${website_name}"]`).fadeOut(200, function () {
+function remove_website_card (website_subdomain, callback = null) {
+    $(`.website-card[data-subdomain="${website_subdomain}"]`).fadeOut(200, function () {
         $(this).remove();
 
         // Update the global websites array to remove the deleted website
-        window.websites = window.websites.filter(website => website.subdomain !== website_name);
+        window.websites = window.websites.filter(website => website.subdomain !== website_subdomain);
 
-        if ( $('.website-card').length === 0 ) {
+        if ( window.websites.length === 0 ) {
             $('section:not(.sidebar)').hide();
             $('#no-websites-notice').show();
         } else {
@@ -326,12 +321,10 @@ function remove_website_card (website_name, callback = null) {
         if ( $('.website-checkbox:checked').length === 0 ) {
             $('.select-all-websites').prop('indeterminate', false);
             $('.select-all-websites').prop('checked', false);
-        }
-        else if ( $('.website-checkbox:checked').length === $('.website-card').length ) {
+        } else if ( $('.website-checkbox:checked').length === $('.website-card').length ) {
             $('.select-all-websites').prop('indeterminate', false);
             $('.select-all-websites').prop('checked', true);
-        }
-        else {
+        } else {
             $('.select-all-websites').prop('indeterminate', true);
         }
 
@@ -363,16 +356,16 @@ $(document).on('click', '.delete-websites-btn', async function (e) {
         puter.ui.showSpinner();
 
         let start_ts = Date.now();
-        const websites = $('.website-checkbox:checked').toArray();
+        const websites_to_delete = $('.website-checkbox:checked').toArray();
 
         // delete all checked websites
-        for ( let website of websites ) {
-            let website_name = $(website).attr('data-website-name');
+        for ( let website_el of websites_to_delete ) {
+            let subdomain = $(website_el).attr('data-website-subdomain');
             // delete website
-            await puter.hosting.delete(website_name);
+            await puter.hosting.delete(subdomain);
 
             // remove website card
-            remove_website_card(website_name);
+            remove_website_card(subdomain);
 
             try {
                 count_websites();
@@ -399,29 +392,29 @@ $(document).on('click', '.options-icon-website', function (e) {
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
+    const subdomain = $(this).attr('data-website-subdomain');
     puter.ui.contextMenu({
         items: [
             {
                 label: 'Change Directory',
                 action: () => {
-                    change_website_directory($(this).attr('data-website-name'));
+                    change_website_directory(subdomain);
                 },
             },
-            '-',
             {
                 label: 'Delete',
                 type: 'danger',
                 action: () => {
-                    attempt_website_deletion($(this).attr('data-website-name'));
+                    attempt_website_deletion(subdomain);
                 },
             },
         ],
     });
 });
 
-async function attempt_website_deletion (website_name) {
+async function attempt_website_deletion (website_subdomain) {
     // confirm delete
-    const alert_resp = await puter.ui.alert(`Are you sure you want to premanently delete <strong>${html_encode(website_name)}.puter.site</strong>?`,
+    const alert_resp = await puter.ui.alert(`Are you sure you want to permanently delete <strong>${html_encode(website_subdomain)}.${static_hosting_domain}</strong>?`,
                     [
                         {
                             label: 'Yes, delete permanently',
@@ -435,43 +428,30 @@ async function attempt_website_deletion (website_name) {
 
     if ( alert_resp === 'delete' ) {
         // remove website card and update website count
-        remove_website_card(website_name);
+        remove_website_card(website_subdomain);
 
         // delete website
-        puter.hosting.delete(website_name);
+        puter.hosting.delete(website_subdomain).then().catch(async (err) => {
+            puter.ui.alert(err?.message, [
+                {
+                    label: 'Ok',
+                },
+            ]);
+        });
     }
 }
 
 async function change_website_directory (website_name) {
     try {
-        // Step 1: Show directory picker
-        const selectedDirectory = await puter.ui.showDirectoryPicker();
+        // Step 1: Open directory picker to let the user choose a new directory
+        const selectedDirectory = await puter.ui.showOpenDirectoryPicker();
 
+        // Step 2: Validate that a directory was actually chosen
         if ( !selectedDirectory || !selectedDirectory.path ) {
-            return; // User cancelled
-        }
-
-        // Step 2: Confirm the change since it will replace the current website
-        const confirmResp = await puter.ui.alert(`Are you sure you want to change the directory for <strong>${html_encode(website_name)}.puter.site</strong>?<br><br>This will update the website to serve files from the new directory.`,
-                        [
-                            {
-                                label: 'Yes, change directory',
-                                value: 'change',
-                                type: 'primary',
-                            },
-                            {
-                                label: 'Cancel',
-                            },
-                        ],
-                        {
-                            type: 'info',
-                        });
-
-        if ( confirmResp !== 'change' ) {
             return;
         }
 
-        // Step 3: Show loading spinner
+        // Step 3: Show loading spinner while updating the website configuration
         puter.ui.showSpinner();
 
         try {
@@ -494,14 +474,13 @@ async function change_website_directory (website_name) {
             puter.ui.alert(`Error changing website directory: ${error.error?.message || error.message || 'Unknown error'}`, [], {
                 type: 'error',
             });
-        } finally {
-            // Hide loading spinner
-            puter.ui.hideSpinner();
-        }
-
+        } return;
     } catch ( error ) {
         // Handle directory picker error
         console.log('Directory picker cancelled or error:', error);
+    } finally {
+        // Hide loading spinner
+        puter.ui.hideSpinner();
     }
 }
 
