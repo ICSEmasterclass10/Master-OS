@@ -127,112 +127,8 @@ $(document).on('click', '.tab-btn', async function (e) {
         // Reset websites search when tab is activated
         resetWebsitesSearch();
     }
-    // ---------------------------------------------------------------
-    // Payout Method tab
-    // ---------------------------------------------------------------
-    else if ( $(this).attr('data-tab') === 'payout-method' ) {
-        activeTab = 'payout-method';
-        puter.ui.showSpinner();
-        setTimeout(function () {
-            puter.apps.getDeveloperProfile(function (dev_profile) {
-                // show payout method tab if dev has joined incentive program
-                if ( dev_profile.joined_incentive_program ) {
-                    $('#payout-method-email').html(dev_profile.paypal);
-                }
-                puter.ui.hideSpinner();
-                if ( activeTab === 'payout-method' )
-                {
-                    $('#tab-payout-method').show();
-                }
-            });
-        }, 1000);
-    }
-});
-
-$('.jip-submit-btn').on('click', async function (e) {
-    const first_name = $('#jip-first-name').val();
-    const last_name = $('#jip-last-name').val();
-    const paypal = $('#jip-paypal').val();
-    let error;
-
-    if ( first_name === '' || last_name === '' || paypal === '' )
-    {
-        error = 'All fields are required.';
-    }
-    else if ( first_name.length > 100 )
-    {
-        error = `<strong>First Name</strong> cannot be longer than ${100}.`;
-    }
-    else if ( last_name.length > 100 )
-    {
-        error = `<strong>Last Name</strong> cannot be longer than ${100}.`;
-    }
-    else if ( paypal.length > 100 )
-    {
-        error = `<strong>Paypal</strong> cannot be longer than ${100}.`;
-    }
-    // check if email is valid
-    else if ( ! validateEmail(paypal) )
-    {
-        error = 'Paypal email must be a valid email address.';
-    }
-
-    // error?
-    if ( error ) {
-        $('#jip-error').show();
-        $('#jip-error').html(error);
-        document.body.scrollTop = document.documentElement.scrollTop = 0;
-        return;
-    }
-
-    // disable submit button
-    $('.jip-submit-btn').prop('disabled', true);
-
-    $.ajax({
-        url: `${puter.APIOrigin }/jip`,
-        type: 'POST',
-        async: true,
-        contentType: 'application/json',
-        data: JSON.stringify({
-            first_name: first_name,
-            last_name: last_name,
-            paypal: paypal,
-        }),
-        headers: {
-            'Authorization': `Bearer ${ puter.authToken}`,
-        },
-        success: function () {
-            $('#jip-success').show();
-            $('#jip-form').hide();
-            //enable submit button
-            $('.jip-submit-btn').prop('disabled', false);
-            // update dev profile
-            $('#payout-method-email').html(paypal);
-            // show separator
-            $('.tab-btn-separator').show();
-            // show payout method tab
-            $('.tab-btn[data-tab="payout-method"]').show();
-        },
-        error: function (err) {
-            $('#jip-error').show();
-            $('#jip-error').html(err.message);
-            // scroll to top so that user sees error message
-            document.body.scrollTop = document.documentElement.scrollTop = 0;
-            // enable submit button
-            $('.jip-submit-btn').prop('disabled', false);
-        },
-    });
-});
-
-$('#earn-money-c2a-close').click(async function (e) {
-    $('#earn-money').get(0).close();
-    puter.kv.set('earn-money-c2a-closed', 'true');
-});
-
-$('#earn-money::backdrop').click(async function (e) {
-    alert();
-    $('#earn-money').get(0).close();
-    puter.kv.set('earn-money-c2a-closed', 'true');
+    
+    puter.ui.hideSpinner();
 });
 
 // https://stackoverflow.com/a/43467144/1764493
@@ -328,7 +224,7 @@ $(document).on('click', '.section-tab-btn', function (e) {
     // hide all tabs
     $('.section-tab').hide();
     // show section
-    $(`.section-tab[data-tab="${$(this).attr('data-tab')}"]`).show();
+    $(`section[data-tab="${$(this).attr('data-tab')}"]`).show();
     // remove active class from all tab buttons
     $('.section-tab-btn').removeClass('active');
     // add active class to clicked tab button
