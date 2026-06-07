@@ -22,8 +22,7 @@ window.create_worker = async (name, filePath = null) => {
 };
 
 window.refresh_worker_list = async (show_loading = false) => {
-    if ( show_loading )
-    {
+    if ( show_loading ) {
         puter.ui.showSpinner();
     }
 
@@ -62,11 +61,10 @@ $(document).on('click', '.create-a-worker-btn', async function (e) {
     // if user doesn't have an email, request it
     if ( !window.user?.email || !window.user?.email_confirmed ) {
         const email_confirm_resp = await puter.ui.requestEmailConfirmation();
-        if ( ! email_confirm_resp )
-        {
-            UIAlert('Email confirmation required to create a worker.');
+        if ( ! email_confirm_resp ) {
+            puter.ui.alert('Email confirmation required to create a worker.');
+            return;
         }
-        return;
     }
 
     // refresh user data
@@ -114,12 +112,9 @@ $(document).on('click', '.worker-checkbox', function (e) {
             checkbox.prop('checked', $(this).is(':checked'));
 
             // activate row
-            if ( $(checkbox).is(':checked') )
-            {
+            if ( $(checkbox).is(':checked') ) {
                 $(checkbox).closest('tr').addClass('active');
-            }
-            else
-            {
+            } else {
                 $(checkbox).closest('tr').removeClass('active');
             }
         }
@@ -132,29 +127,22 @@ $(document).on('click', '.worker-checkbox', function (e) {
     } else if ( $('.worker-checkbox:checked').length > 0 ) {
         $('.select-all-workers').prop('indeterminate', true);
         $('.select-all-workers').prop('checked', false);
-    }
-    else {
+    } else {
         $('.select-all-workers').prop('indeterminate', false);
         $('.select-all-workers').prop('checked', false);
     }
 
     // activate row
-    if ( $(this).is(':checked') )
-    {
+    if ( $(this).is(':checked') ) {
         $(this).closest('tr').addClass('active');
-    }
-    else
-    {
+    } else {
         $(this).closest('tr').removeClass('active');
     }
 
     // enable delete button if at least one checkbox is checked
-    if ( $('.worker-checkbox:checked').length > 0 )
-    {
+    if ( $('.worker-checkbox:checked').length > 0 ) {
         $('.delete-workers-btn').removeClass('disabled');
-    }
-    else
-    {
+    } else {
         $('.delete-workers-btn').addClass('disabled');
     }
 
@@ -187,16 +175,12 @@ $('th.sort').on('click', function (e) {
 
     // toggle sort direction
     if ( sortByColumn === sortBy ) {
-        if ( sortDirection === 'asc' )
-        {
+        if ( sortDirection === 'asc' ) {
             sortDirection = 'desc';
-        }
-        else
-        {
+        } else {
             sortDirection = 'asc';
         }
-    }
-    else {
+    } else {
         sortBy = sortByColumn;
         sortDirection = 'desc';
     }
@@ -222,9 +206,8 @@ function sort_workers () {
                 return new Date(a[sortBy]) - new Date(b[sortBy]);
             } else if ( sortBy === 'file_path' ) {
                 return a[sortBy].localeCompare(b[sortBy]);
-            }
-            else {
-                a[sortBy] > b[sortBy] ? 1 : -1;
+            } else {
+                return a[sortBy] > b[sortBy] ? 1 : -1;
             }
         });
     } else {
@@ -236,7 +219,7 @@ function sort_workers () {
             } else if ( sortBy === 'file_path' ) {
                 return b[sortBy].localeCompare(a[sortBy]);
             } else {
-                b[sortBy] > a[sortBy] ? 1 : -1;
+                return b[sortBy] > a[sortBy] ? 1 : -1;
             }
         });
     }
@@ -250,7 +233,6 @@ function sort_workers () {
 
     // show workers that match search_query and hide workers that don't
     if ( search_query ) {
-        // show workers that match search_query and hide workers that don't
         workers.forEach((worker) => {
             if ( worker.name.toLowerCase().includes(search_query.toLowerCase()) ) {
                 $(`.worker-card[data-name="${html_encode(worker.name)}"]`).show();
@@ -300,10 +282,7 @@ window.search_workers = function () {
         $('.search-clear-workers').show();
         // show workers that match search_query and hide workers that don't
         workers.forEach((worker) => {
-            if (
-                worker.name.toLowerCase().includes(search_query.toLowerCase())
-            )
-            {
+            if ( worker.name.toLowerCase().includes(search_query.toLowerCase()) ) {
                 $(`.worker-card[data-name="${worker.name}"]`).show();
             } else {
                 $(`.worker-card[data-name="${worker.name}"]`).hide();
@@ -342,12 +321,10 @@ function remove_worker_card (worker_name, callback = null) {
         if ( $('.worker-checkbox:checked').length === 0 ) {
             $('.select-all-workers').prop('indeterminate', false);
             $('.select-all-workers').prop('checked', false);
-        }
-        else if ( $('.worker-checkbox:checked').length === $('.worker-card').length ) {
+        } else if ( $('.worker-checkbox:checked').length === $('.worker-card').length ) {
             $('.select-all-workers').prop('indeterminate', false);
             $('.select-all-workers').prop('checked', true);
-        }
-        else {
+        } else {
             $('.select-all-workers').prop('indeterminate', true);
         }
 
